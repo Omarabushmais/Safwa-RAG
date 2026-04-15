@@ -1,0 +1,214 @@
+{
+  "name": "ask-question",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ask-question",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "696aca7c-7b71-49e3-b410-5905e593ec37",
+      "name": "Webhook",
+      "webhookId": "bd77e1f4-f5c7-4dfb-a241-46447c36a029"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer API-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"text-embedding-3-small\",\n  \"input\": \"{{ $json.body.question }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        0
+      ],
+      "id": "e2e7693e-58b1-474e-b382-36e44f17a912",
+      "name": "Open AI"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT chunk_text\nFROM chunks\nWHERE pdf_id = '{{ $('Webhook').first().json.body.pdf_id }}'\nORDER BY embedding <=> '{{ JSON.stringify($json.data[0].embedding) }}'::vector\nLIMIT 5;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        448,
+        0
+      ],
+      "id": "2e83ea60-a391-4b77-ac31-2fb677f014cf",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "p26AYoDTCVsFKQaV",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer API-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  JSON.stringify({\n    \"model\": \"llama-3.3-70b-versatile\",\n    \"messages\": [\n      {\n        \"role\": \"system\",\n        \"content\": \"You are a helpful assistant. Answer the question based ONLY on the provided context. Do not use any outside knowledge. If the answer is not in the context, say 'I could not find this in the document'.\"\n      },\n      {\n        \"role\": \"user\",\n        \"content\": \"Context:\\n\" + $('Execute a SQL query').all().map(i => i.json.chunk_text).join('\\n\\n') + \"\\n\\nQuestion: \" + $('Webhook').first().json.body.question\n      }\n    ],\n    \"temperature\": 0.3\n  })\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        0
+      ],
+      "id": "647f002b-f10f-4eed-b78a-ad68cdc263eb",
+      "name": "Groq 1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer API-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Generate exactly 5 short follow-up questions based on the answer provided. Return ONLY a JSON array of 5 strings, nothing else.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate 5 follow-up questions for this answer:\\n\\n{{ $('Groq 1').first().json.choices[0].message.content }}\"\n    }\n  ],\n  \"temperature\": 0.5\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        896,
+        0
+      ],
+      "id": "06c97893-cd46-4603-9af2-2815be1f955d",
+      "name": "Groq 2"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{\n  {\n    \"answer\": $('Groq 1').first().json.choices[0].message.content,\n    \"followUpQuestions\": $('Groq 2').first().json.choices[0].message.content\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "2d214a6c-a959-445f-a5ca-2568273d0896",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Open AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open AI": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Groq 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq 1": {
+      "main": [
+        [
+          {
+            "node": "Groq 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq 2": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "23563f8a-b775-440f-adcb-1c15a080751f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "284df5d3a62082a592e73574411ea9242c9a3d80f9f945c82702468ff453b3c3"
+  },
+  "id": "6l7ouXAokPcQC3C3",
+  "tags": []
+}

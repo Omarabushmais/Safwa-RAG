@@ -1,0 +1,163 @@
+{
+  "name": "generate-questions",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-questions",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8adfb82a-16f3-4100-b316-bdf0906ca05e",
+      "name": "Webhook",
+      "webhookId": "1c35847d-348e-4052-a8cb-5390d6acf148"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        896,
+        0
+      ],
+      "id": "5523afc2-ae56-4fea-a12e-ac5bec361e9d",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT chunk_text FROM chunks \nWHERE pdf_id = '{{ $json.body.pdf_id }}'\nORDER BY id\nLIMIT 10;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        224,
+        0
+      ],
+      "id": "ab993b7a-4952-4df1-93b1-a5f97c228d03",
+      "name": "Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "p26AYoDTCVsFKQaV",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "AIzaSyDy-pXXygEPuB7bui5-D7r7UXORlprzsa4"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"systemInstruction\": {\n      \"parts\": [\n        {\n          \"text\": \"You are a helpful assistant. Generate exactly 5 short questions based on the provided text. Return ONLY a JSON array of 5 strings, nothing else. Example: [\\\"Question 1?\\\", \\\"Question 2?\\\"]\"\n        }\n      ]\n    },\n    \"contents\": [\n      {\n        \"parts\": [\n          {\n            \"text\": \"Generate 5 important questions based on this text:\\n\\n\" + $('Postgres').all().map(i => i.json.chunk_text).join('\\n\\n')\n          }\n        ]\n      }\n    ],\n    \"generationConfig\": {\n      \"temperature\": 0.5,\n      \"responseMimeType\": \"application/json\"\n    }\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        0
+      ],
+      "id": "dde29642-b49e-44fd-9859-8486da970c5e",
+      "name": "Gemini",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $input.first().json.candidates[0].content.parts[0].text;\n\n\nconst cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();\n\nconst questionsArray = JSON.parse(cleanText);\n\nreturn {\n  json: {\n    questions: questionsArray\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "1681381c-674d-407e-b2c5-4a684d8aa5ca",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres": {
+      "main": [
+        [
+          {
+            "node": "Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "b7defbfb-502b-4eed-85cd-77674c6ab15a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "284df5d3a62082a592e73574411ea9242c9a3d80f9f945c82702468ff453b3c3"
+  },
+  "id": "mTT61zfcAgNxfwGx",
+  "tags": []
+}
