@@ -36,7 +36,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT chunk_text FROM chunks \nWHERE pdf_id = '{{ $json.body.pdf_id }}'\nORDER BY id\nLIMIT 10;",
+        "query": "SELECT chunk_text FROM chunks\nWHERE document_id = '{{ $('Webhook').first().json.body.document_id }}'\nORDER BY RANDOM()\nLIMIT 10;",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -56,39 +56,7 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "x-goog-api-key",
-              "value": "AIzaSyDy-pXXygEPuB7bui5-D7r7UXORlprzsa4"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{\n  {\n    \"systemInstruction\": {\n      \"parts\": [\n        {\n          \"text\": \"You are a helpful assistant. Generate exactly 5 short questions based on the provided text. Return ONLY a JSON array of 5 strings, nothing else. Example: [\\\"Question 1?\\\", \\\"Question 2?\\\"]\"\n        }\n      ]\n    },\n    \"contents\": [\n      {\n        \"parts\": [\n          {\n            \"text\": \"Generate 5 important questions based on this text:\\n\\n\" + $('Postgres').all().map(i => i.json.chunk_text).join('\\n\\n')\n          }\n        ]\n      }\n    ],\n    \"generationConfig\": {\n      \"temperature\": 0.5,\n      \"responseMimeType\": \"application/json\"\n    }\n  }\n}}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        448,
-        0
-      ],
-      "id": "dde29642-b49e-44fd-9859-8486da970c5e",
-      "name": "Gemini",
-      "executeOnce": true
-    },
-    {
-      "parameters": {
-        "jsCode": "const rawText = $input.first().json.candidates[0].content.parts[0].text;\n\n\nconst cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();\n\nconst questionsArray = JSON.parse(cleanText);\n\nreturn {\n  json: {\n    questions: questionsArray\n  }\n};"
+        "jsCode": "// 1. Change the path to match DeepSeek's output\nconst rawText = $input.first().json.choices[0].message.content;\n\n// 2. Clean up the markdown code blocks if the AI added them\nconst cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();\n\n// 3. Parse it into an actual list\nconst parsed = JSON.parse(cleanText);\nreturn {\n  json: {\n    summary: parsed.summary,\n    questions: parsed.questions\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -98,6 +66,39 @@
       ],
       "id": "1681381c-674d-407e-b2c5-4a684d8aa5ca",
       "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer key"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  JSON.stringify({\n    \"model\": \"deepseek-chat\",\n    \"messages\": [\n      {\n        \"role\": \"system\",\n        \"content\": \"You are a helpful assistant. You MUST detect the language of the text and respond in that SAME language. Return ONLY a JSON object with two keys: 'summary' (3-5 sentence summary) and 'questions' (array of exactly 5 short questions). Example: {\\\"summary\\\": \\\"...\\\", \\\"questions\\\": [\\\"سؤال 1؟\\\"]}\"\n      },\n      {\n        \"role\": \"user\",\n        \"content\": \"Generate a summary and 5 important questions based on this text:\\n\\n\" + $('Postgres').all().map(i => i.json.chunk_text).join('\\n\\n')\n      }\n    ],\n    \"temperature\": 0.5,\n    \"response_format\": {\n      \"type\": \"json_object\"\n    }\n  })\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        0
+      ],
+      "id": "dde29642-b49e-44fd-9859-8486da970c5e",
+      "name": "deepseek",
+      "executeOnce": true,
+      "retryOnFail": true
     }
   ],
   "pinData": {},
@@ -117,18 +118,7 @@
       "main": [
         [
           {
-            "node": "Gemini",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Gemini": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript",
+            "node": "deepseek",
             "type": "main",
             "index": 0
           }
@@ -145,6 +135,17 @@
           }
         ]
       ]
+    },
+    "deepseek": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -153,7 +154,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "b7defbfb-502b-4eed-85cd-77674c6ab15a",
+  "versionId": "4b0b84b0-ab10-4deb-8902-53377be08f66",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "284df5d3a62082a592e73574411ea9242c9a3d80f9f945c82702468ff453b3c3"

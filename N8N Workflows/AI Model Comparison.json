@@ -1,0 +1,1007 @@
+{
+  "name": "AI Model Comparison",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b3d6a48e-98c9-43c5-8fa6-3f3c75dda239",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ✏️ CHANGE YOUR PROMPT HERE\nconst PROMPT = `Your task is to explain loan options clearly and concisely to customers. and Evaluate the customer and return a decision in STRICT JSON format.\n \n \nCustomer profile:\n- Monthly salary: 800 JOD\n- Employment type: self-employed\n- Existing loans: credit card debt\n- Requested loan type: debt consolidation\n \nInstructions:\n- Suggest suitable loan products\n- Provide estimated interest rates\n- Mention key benefits\n- Include any relevant offers or promotions\n- Keep the tone professional and simple\n \n \nRules:\n- Do NOT output anything except valid JSON\n- Use ONLY these values:\n- RiskLevel: [\"Low\", \"Medium\", \"High\"]\n- Decision: [\"Approve\", \"Conditional\", \"Reject\"]\n \nResponse format:\n- Loan Options\n- Interest Rates\n- Offers\n- Recommendation\n \nJSON Schema:\n{\n  \"risk_level\": \"...\",\n  \"decision\": \"...\",\n  \"reason\": \"...\",\n  \"recommended_offer\": \"...\"\n}`;\n\nreturn [{ json: { prompt: PROMPT, startedAt: Date.now() } }];"
+      },
+      "id": "1e750017-655e-411e-9679-2caa41f355fb",
+      "name": "Set Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify($json.prompt) }}\n    }\n  ]\n}",
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "id": "247d464c-c3d0-4fb5-ac80-b51c5cc1a245",
+      "name": "GPT-4o Mini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vWn8x6NOsgplgo9v",
+          "name": "Groq"
+        },
+        "httpCustomAuth": {
+          "id": "g4v1AStwRZepCwVO",
+          "name": "OPEN AI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4.1-nano\",\n  \"max_tokens\": 500,\n  \"messages\": [\n    {\n      \"role\": \"user\", \n      \"content\": {{ JSON.stringify($('Set Prompt').item.json.prompt) }}\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "09ebfa84-eb19-4433-94d7-31ce5fbfda75",
+      "name": "GPT-4.1 Nano",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        432
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vWn8x6NOsgplgo9v",
+          "name": "Groq"
+        },
+        "httpCustomAuth": {
+          "id": "g4v1AStwRZepCwVO",
+          "name": "OPEN AI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 500,\n  \"messages\": [{\"role\": \"user\", \"content\": \"{{ $('Set Prompt').item.json.prompt }}\"}]\n}",
+        "options": {}
+      },
+      "id": "a14641ae-af48-4a42-a344-3d02ab225926",
+      "name": "Claude Haiku 3.5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        624
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vWn8x6NOsgplgo9v",
+          "name": "Groq"
+        },
+        "httpCustomAuth": {
+          "id": "9U2SToYdN73Miuc4",
+          "name": "Claude"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\"parts\": [{\"text\": \"{{ $('Set Prompt').item.json.prompt }}\"}]}],\n  \"generationConfig\": {\"maxOutputTokens\": 500}\n}",
+        "options": {}
+      },
+      "id": "e3e321ef-a80e-401f-ada8-9afed4628bcd",
+      "name": "Gemini 2.0 Flash",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        816
+      ],
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "9U2SToYdN73Miuc4",
+          "name": "Claude"
+        },
+        "googlePalmApi": {
+          "id": "vhs7e1JjCfDpBryp",
+          "name": "Gemini"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\"parts\": [{\"text\": \"{{ $('Set Prompt').item.json.prompt }}\"}]}],\n  \"generationConfig\": {\"maxOutputTokens\": 500}\n}",
+        "options": {}
+      },
+      "id": "342ef52e-359d-4d71-9ff2-706e9faa0e5a",
+      "name": "Gemini 2.0 Flash Lite",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        1008
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "vhs7e1JjCfDpBryp",
+          "name": "Gemini"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"max_tokens\": 500,\n  \"messages\": [\n    {\n      \"role\": \"user\", \n      \"content\": {{ JSON.stringify($('Set Prompt').item.json.prompt) }}\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "b781466a-b8e8-46e1-8108-b239dbdf804b",
+      "name": "Llama 3.3 70B",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        1200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vWn8x6NOsgplgo9v",
+          "name": "Groq"
+        },
+        "httpCustomAuth": {
+          "id": "q09bD3cMQn5bxojI",
+          "name": "Groq"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"max_tokens\": 500,\n  \"messages\": [\n    {\n      \"role\": \"user\", \n      \"content\": {{ JSON.stringify($('Set Prompt').item.json.prompt) }}\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "9c430b1e-bb7a-4655-ab16-889f1c54255e",
+      "name": "Llama 3.1 8B",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        1392
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vWn8x6NOsgplgo9v",
+          "name": "Groq"
+        },
+        "httpCustomAuth": {
+          "id": "q09bD3cMQn5bxojI",
+          "name": "Groq"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"meta-llama/llama-4-scout-17b-16e-instruct\",\n  \"max_tokens\": 500,\n  \"messages\": [\n    {\n      \"role\": \"user\", \n      \"content\": {{ JSON.stringify($('Set Prompt').item.json.prompt) }}\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "d0d49175-40bf-4bb9-b7f4-54d9ca528ea8",
+      "name": "Llama 4 Scout",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        1584
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vWn8x6NOsgplgo9v",
+          "name": "Groq"
+        },
+        "httpCustomAuth": {
+          "id": "q09bD3cMQn5bxojI",
+          "name": "Groq"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cohere.com/v2/chat",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"command-r7b-12-2024\",\n  \"max_tokens\": 500,\n  \"messages\": [\n    {\n      \"role\": \"user\", \n      \"content\": {{ JSON.stringify($('Set Prompt').item.json.prompt) }}\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "12584b11-60d7-40e5-9520-51fd02461cb5",
+      "name": "Cohere Command R7B",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        1776
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "olWr2rfXOS08yyeX",
+          "name": "Cohere"
+        },
+        "httpCustomAuth": {
+          "id": "6DmcGXRJxuUJTFMq",
+          "name": "Cohere"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// NORMALISE — Extract text + tokens from each provider's\n// different response shape, tag with model metadata\n// ============================================================\nconst nodeMeta = {\n  \"GPT-4o Mini\":           { provider: \"openai\",    inCost: 0.15,   outCost: 0.60, ctx: \"128K\" },\n  \"GPT-4.1 Nano\":          { provider: \"openai\",    inCost: 0.10,   outCost: 0.40, ctx: \"1M\"   },\n  \"Claude Haiku 3.5\":      { provider: \"anthropic\", inCost: 0.80,   outCost: 4.00, ctx: \"200K\" },\n  \"Gemini 2.0 Flash\":      { provider: \"google\",    inCost: 0.10,   outCost: 0.40, ctx: \"1M\"   },\n  \"Gemini 2.0 Flash Lite\": { provider: \"google\",    inCost: 0.075,  outCost: 0.30, ctx: \"1M\"   },\n  \"Llama 3.3 70B\":         { provider: \"groq\",      inCost: 0.59,   outCost: 0.79, ctx: \"128K\" },\n  \"Llama 3.1 8B\":          { provider: \"groq\",      inCost: 0.05,   outCost: 0.08, ctx: \"128K\" },\n  \"Llama 4 Scout\":         { provider: \"groq\",      inCost: 0.11,   outCost: 0.34, ctx: \"131K\" },\n  \"Qwen3 8B\":              { provider: \"groq\",      inCost: 0.00,   outCost: 0.00, ctx: \"128K\" },\n  \"Gemma 2 9B\":            { provider: \"groq\",      inCost: 0.20,   outCost: 0.20, ctx: \"8K\"   },\n  \"Cohere Command R7B\":    { provider: \"cohere\",    inCost: 0.0375, outCost: 0.15, ctx: \"128K\" },\n  \"DeepSeek\":              { provider: \"deepseek\",  inCost: 0.07,   outCost: 0.28, ctx: \"64K\"  }\n};\n\n// ⚠️ THIS MUST MATCH YOUR MERGE NODE CONNECTIONS TOP-TO-BOTTOM\n// Remove any models you deleted from the workflow!\nconst modelOrder = [\n  \"GPT-4o Mini\",\n  \"GPT-4.1 Nano\",\n  \"Claude Haiku 3.5\",\n  \"Gemini 2.0 Flash\",\n  \"Gemini 2.0 Flash Lite\",\n  \"Llama 3.3 70B\",\n  \"Llama 3.1 8B\",\n  \"Llama 4 Scout\",\n  \"Cohere Command R7B\",\n  \"DeepSeek\"\n];\n\nconst items = $input.all();\nconst prompt = $('Set Prompt').first().json.prompt;\nconst startedAt = $('Set Prompt').first().json.startedAt;\n\nconst normalised = items.map((item, index) => {\n  const raw = item.json;\n  \n  // Grab the name based on the wire connection order, ignoring n8n's stripped metadata\n  const nodeName = modelOrder[index] || \"Unknown\";\n\n  // Try every known response shape\n  let text      = \"\";\n  let inputTok  = 0;\n  let outputTok = 0;\n  let success   = true;\n  let errorMsg  = null;\n\n  try {\n    if (raw.choices) {\n      // OpenAI / Groq / Mistral / OpenRouter shape\n      text      = raw.choices[0]?.message?.content || \"\";\n      inputTok  = raw.usage?.prompt_tokens     || 0;\n      outputTok = raw.usage?.completion_tokens || 0;\n    } else if (raw.content && Array.isArray(raw.content)) {\n      // Anthropic shape\n      text      = raw.content[0]?.text || \"\";\n      inputTok  = raw.usage?.input_tokens  || 0;\n      outputTok = raw.usage?.output_tokens || 0;\n    } else if (raw.candidates) {\n      // Google AI shape\n      text      = raw.candidates[0]?.content?.parts[0]?.text || \"\";\n      inputTok  = raw.usageMetadata?.promptTokenCount     || 0;\n      outputTok = raw.usageMetadata?.candidatesTokenCount || 0;\n    } else if (raw.message?.content) {\n      // Cohere v2 shape\n      text      = raw.message.content[0]?.text || \"\";\n      inputTok  = raw.meta?.billed_units?.input_tokens  || 0;\n      outputTok = raw.meta?.billed_units?.output_tokens || 0;\n    } else if (raw.error || raw.message) {\n      success  = false;\n      errorMsg = raw.error?.message || raw.message || \"Unknown error\";\n      text     = \"ERROR: \" + errorMsg;\n    } else {\n      success = false;\n      errorMsg = \"Invalid Format / Disabled Node Skipped\";\n      text = JSON.stringify(raw).slice(0, 200);\n    }\n  } catch(e) {\n    success  = false;\n    errorMsg = e.message;\n    text     = \"PARSE ERROR: \" + e.message;\n  }\n\n  const meta    = nodeMeta[nodeName] || { provider: \"unknown\", inCost: 0, outCost: 0, ctx: \"?\" };\n  const costUSD = ((inputTok / 1e6) * meta.inCost) + ((outputTok / 1e6) * meta.outCost);\n  // Fallback to Date.now() just in case a node failed and didn't stamp the time\n  const endTime = raw.endedAt || Date.now(); \n  const latency = endTime - startedAt;\n  \n  return {\n    json: {\n      modelName:    nodeName,\n      provider:     meta.provider,\n      responseText: text,\n      inputTokens:  inputTok,\n      outputTokens: outputTok,\n      totalTokens:  inputTok + outputTok,\n      costUSD,\n      inCostPer1M:  meta.inCost,\n      outCostPer1M: meta.outCost,\n      contextWindow: meta.ctx,\n      success,\n      errorMsg,\n      prompt,\n      latencyMs: latency\n    }\n  };\n});\n\nreturn normalised;"
+      },
+      "id": "d1e31822-b2fd-4b28-a897-a9d14f3d1f19",
+      "name": "Normalise All Responses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"model\": \"gpt-4o-mini\",\n    \"max_tokens\": 150,\n    \"temperature\": 0.1,\n    \"messages\": [\n      {\n        \"role\": \"user\",\n        \"content\": \"You are an objective AI response quality evaluator.\\nScore the following AI response on a scale of 1-10 based on:\\n- Accuracy (factually correct?)\\n- Clarity (easy to understand?)\\n- Completeness (fully answers the question?)\\n- Conciseness (no unnecessary fluff?)\\n\\nRespond ONLY with a JSON object, no extra text:\\n{\\\"score\\\": <1-10>, \\\"reason\\\": \\\"<one sentence>\\\"}\\n\\nQuestion asked: \\\"\" + $json.prompt + \"\\\"\\n\\nAI Response:\\n\\\"\" + $json.responseText + \"\\\"\"\n      }\n    ]\n  }\n}}",
+        "options": {}
+      },
+      "id": "45d66576-21c6-4ed9-9f92-bcb8774aa4ac",
+      "name": "Quality Judge (GPT-4o-mini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1344,
+        1104
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vWn8x6NOsgplgo9v",
+          "name": "Groq"
+        },
+        "httpCustomAuth": {
+          "id": "g4v1AStwRZepCwVO",
+          "name": "OPEN AI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Grab the output from the judge\nconst judgeItems = $input.all();\n\n// Reach back and grab the original intact data from the Normalise node\nconst originalItems = $('Normalise All Responses').all();\n\nreturn judgeItems.map((item, index) => {\n  const raw = item.json;\n  const originalData = originalItems[index].json; // Match the original data!\n\n  let score  = 0;\n  let reason = \"Could not evaluate\";\n\n  try {\n    // Extract the judge's evaluation\n    const text   = raw.choices[0]?.message?.content || \"\";\n    const clean  = text.replace(/```json|```/g, \"\").trim();\n    const parsed = JSON.parse(clean);\n    score  = parsed.score  || 0;\n    reason = parsed.reason || reason;\n  } catch(e) {\n    reason = \"Parse error: \" + e.message;\n  }\n\n  // Combine the original data with the new scores\n  return {\n    json: {\n      ...originalData, \n      qualityScore:  score,\n      qualityReason: reason\n    }\n  };\n});"
+      },
+      "id": "f4bee116-0a99-41da-9795-b49a2b0bf6c1",
+      "name": "Attach Judge Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 10
+      },
+      "id": "0c90b35e-2a7e-44fa-ab13-bc22e5f0a3d0",
+      "name": "Merge 13 Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        896,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// BUILD FINAL RANKED REPORT\n// ============================================================\nconst results = $input.all().map(i => i.json);\n\n// Sort: quality desc, then latency asc\nresults.sort((a,b) => b.qualityScore - a.qualityScore);\n\nconst ok = results.filter(r => r.success);\n\nconst best    = arr => arr.length ? arr.reduce((a,b) => a.qualityScore > b.qualityScore ? a : b) : null;\nconst fastest = arr => arr.length ? arr.reduce((a,b) => a.latencyMs    < b.latencyMs    ? a : b) : null;\nconst cheap   = arr => arr.length ? arr.reduce((a,b) => a.costUSD      < b.costUSD      ? a : b) : null;\nconst value   = arr => arr.length\n  ? arr.reduce((a,b) =>\n      (a.qualityScore/(a.costUSD+1e-9)) > (b.qualityScore/(b.costUSD+1e-9)) ? a : b)\n  : null;\n\nconst W = { quality: best(ok), cheapest: cheap(ok), value: value(ok), fastest: fastest(ok) };\n\n// Markdown\nlet md = `# 🤖 AI Model Comparison — 13 Models\\n`;\nmd += `**Prompt:** \"${results[0]?.prompt}\"\\n`;\nmd += `**Run:** ${new Date().toISOString()}\\n\\n`;\nmd += `---\\n\\n## 🏆 Winners\\n`;\nif (W.quality)  md += `- 🥇 **Best Quality:** ${W.quality.modelName} — ${W.quality.qualityScore}/10\\n`;\nif (W.cheapest) md += `- 💰 **Cheapest:** ${W.cheapest.modelName} — $${W.cheapest.costUSD.toFixed(8)}/run\\n`;\nif (W.value)    md += `- ⚖️ **Best Value:** ${W.value.modelName}\\n`;\nif (W.fastest)  md += `- ⚡ **Fastest:** ${W.fastest.modelName} — ${W.fastest.latencyMs}ms\\n`;\nmd += `\\n---\\n\\n## 📊 Full Ranked Table\\n\\n`;\nmd += `| # | Model | Provider | Score | Cost/Run | In $/1M | Out $/1M | Tokens | Context | Status |\\n`;\nmd += `|---|-------|----------|-------|----------|---------|----------|--------|---------|--------|\\n`;\n\nresults.forEach((r, i) => {\n  md += `| ${i+1} | **${r.modelName}** | ${r.provider} | ${r.qualityScore}/10 | $${(r.costUSD||0).toFixed(8)} | $${r.inCostPer1M} | $${r.outCostPer1M} | ${r.totalTokens||0} | ${r.contextWindow} | ${r.success ? '✅' : '❌'} |\\n`;\n});\n\nmd += `\\n---\\n\\n## 📝 Responses\\n\\n`;\nresults.forEach((r,i) => {\n  md += `### ${i+1}. ${r.modelName}  —  ${r.qualityScore}/10\\n`;\n  md += `> ${(r.responseText||'').slice(0,500)}${(r.responseText||'').length>500?'...':''}\\n\\n`;\n  md += `*Judge: ${r.qualityReason}*\\n\\n---\\n\\n`;\n});\n\nreturn [{\n  json: {\n    summary: {\n      totalModels:   results.length,\n      successCount:  ok.length,\n      bestQuality:   W.quality?.modelName,\n      cheapest:      W.cheapest?.modelName,\n      bestValue:     W.value?.modelName,\n      fastest: W.fastest?.modelName\n    },\n    rankings:       results.map((r,i) => ({ rank: i+1, model: r.modelName, score: r.qualityScore, reason: r.qualityReason, costUSD: r.costUSD, totalTokens: r.totalTokens, context: r.contextWindow, status: r.success })),\n    markdownReport: md\n  }\n}];"
+      },
+      "id": "06d32522-c4c5-414e-836f-c160841e9a4b",
+      "name": "Build Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"deepseek-chat\",\n  \"max_tokens\": 500,\n  \"messages\": [\n    {\n      \"role\": \"user\", \n      \"content\": {{ JSON.stringify($('Set Prompt').item.json.prompt) }}\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "02a43df2-cc6a-4ff9-8ef0-faff727be1e4",
+      "name": "DeepSeek",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        1968
+      ],
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "HH5f4qIvDfjxiQra",
+          "name": "Deepseek"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stamp the exact time this specific model finished\nreturn {\n  json: {\n    ...$input.item.json,\n    endedAt: Date.now()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        240
+      ],
+      "id": "8d8d76dc-4a9d-40d7-8add-9abc4659416c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stamp the exact time this specific model finished\nreturn {\n  json: {\n    ...$input.item.json,\n    endedAt: Date.now()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        432
+      ],
+      "id": "421cc6c5-4b9d-4f2a-9f15-5cc683b08bcb",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stamp the exact time this specific model finished\nreturn {\n  json: {\n    ...$input.item.json,\n    endedAt: Date.now()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        624
+      ],
+      "id": "f107f63f-30a0-401d-bb09-4913da89b3a5",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stamp the exact time this specific model finished\nreturn {\n  json: {\n    ...$input.item.json,\n    endedAt: Date.now()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        816
+      ],
+      "id": "45611c73-0dbe-4f94-8474-88d208d21503",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stamp the exact time this specific model finished\nreturn {\n  json: {\n    ...$input.item.json,\n    endedAt: Date.now()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        1008
+      ],
+      "id": "17c8f164-508e-4cce-97f4-c9b2fd1a6707",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stamp the exact time this specific model finished\nreturn {\n  json: {\n    ...$input.item.json,\n    endedAt: Date.now()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        1200
+      ],
+      "id": "6f7399a1-3ec9-4da5-9152-1cde04c54fe4",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stamp the exact time this specific model finished\nreturn {\n  json: {\n    ...$input.item.json,\n    endedAt: Date.now()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        1392
+      ],
+      "id": "2a9d013d-12ed-4e87-93bb-c634f3dbf91f",
+      "name": "Code in JavaScript6"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stamp the exact time this specific model finished\nreturn {\n  json: {\n    ...$input.item.json,\n    endedAt: Date.now()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        1584
+      ],
+      "id": "79b76b32-6331-4ada-9428-31f002ba609a",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stamp the exact time this specific model finished\nreturn {\n  json: {\n    ...$input.item.json,\n    endedAt: Date.now()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        1776
+      ],
+      "id": "58ff7d07-52bf-4c52-89e3-5ce8b6b73cf8",
+      "name": "Code in JavaScript8"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stamp the exact time this specific model finished\nreturn {\n  json: {\n    ...$input.item.json,\n    endedAt: Date.now()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        1968
+      ],
+      "id": "d412abd7-ebd4-4f7e-998f-b6fb52f6e9ba",
+      "name": "Code in JavaScript9"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawResponse = $json.choices[0].message.content;\nreturn {\n  json: JSON.parse(rawResponse)\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        80
+      ],
+      "id": "db7771fd-c397-4684-a95a-b58a8e6b3274",
+      "name": "display answer"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Prompt": {
+      "main": [
+        [
+          {
+            "node": "GPT-4o Mini",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GPT-4.1 Nano",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Claude Haiku 3.5",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gemini 2.0 Flash",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gemini 2.0 Flash Lite",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Llama 3.3 70B",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Llama 3.1 8B",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Llama 4 Scout",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Cohere Command R7B",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "DeepSeek",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4o Mini": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "display answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4.1 Nano": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge 13 Results": {
+      "main": [
+        [
+          {
+            "node": "Normalise All Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise All Responses": {
+      "main": [
+        [
+          {
+            "node": "Quality Judge (GPT-4o-mini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quality Judge (GPT-4o-mini)": {
+      "main": [
+        [
+          {
+            "node": "Attach Judge Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Judge Score": {
+      "main": [
+        [
+          {
+            "node": "Build Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Haiku 3.5": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini 2.0 Flash": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini 2.0 Flash Lite": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Llama 3.3 70B": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Llama 3.1 8B": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Llama 4 Scout": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cohere Command R7B": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript9": {
+      "main": [
+        [
+          {
+            "node": "Merge 13 Results",
+            "type": "main",
+            "index": 9
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript8": {
+      "main": [
+        [
+          {
+            "node": "Merge 13 Results",
+            "type": "main",
+            "index": 8
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "Merge 13 Results",
+            "type": "main",
+            "index": 7
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript6": {
+      "main": [
+        [
+          {
+            "node": "Merge 13 Results",
+            "type": "main",
+            "index": 6
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Merge 13 Results",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Merge 13 Results",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Merge 13 Results",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Merge 13 Results",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Merge 13 Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge 13 Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "2469b579-f244-486d-a92e-0b085a0692c1",
+  "meta": {
+    "instanceId": "284df5d3a62082a592e73574411ea9242c9a3d80f9f945c82702468ff453b3c3"
+  },
+  "id": "etP7sRM5BfLWtHV9",
+  "tags": []
+}

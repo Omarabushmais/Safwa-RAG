@@ -31,7 +31,7 @@
             },
             {
               "name": "Authorization",
-              "value": "Bearer API-KEY"
+              "value": "Bearer key"
             }
           ]
         },
@@ -47,12 +47,13 @@
         0
       ],
       "id": "e2e7693e-58b1-474e-b382-36e44f17a912",
-      "name": "Open AI"
+      "name": "Open AI",
+      "retryOnFail": true
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT chunk_text\nFROM chunks\nWHERE pdf_id = '{{ $('Webhook').first().json.body.pdf_id }}'\nORDER BY embedding <=> '{{ JSON.stringify($json.data[0].embedding) }}'::vector\nLIMIT 5;",
+        "query": "SELECT chunk_text\nFROM chunks\nWHERE document_id = '{{ $('Webhook').first().json.body.document_id }}'\nORDER BY embedding <=> '{{ JSON.stringify($json.data[0].embedding) }}'::vector\nLIMIT 5;",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -72,62 +73,6 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.groq.com/openai/v1/chat/completions",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "Bearer API-KEY"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{\n  JSON.stringify({\n    \"model\": \"llama-3.3-70b-versatile\",\n    \"messages\": [\n      {\n        \"role\": \"system\",\n        \"content\": \"You are a helpful assistant. Answer the question based ONLY on the provided context. Do not use any outside knowledge. If the answer is not in the context, say 'I could not find this in the document'.\"\n      },\n      {\n        \"role\": \"user\",\n        \"content\": \"Context:\\n\" + $('Execute a SQL query').all().map(i => i.json.chunk_text).join('\\n\\n') + \"\\n\\nQuestion: \" + $('Webhook').first().json.body.question\n      }\n    ],\n    \"temperature\": 0.3\n  })\n}}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        672,
-        0
-      ],
-      "id": "647f002b-f10f-4eed-b78a-ad68cdc263eb",
-      "name": "Groq 1"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.groq.com/openai/v1/chat/completions",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "Bearer API-KEY"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Generate exactly 5 short follow-up questions based on the answer provided. Return ONLY a JSON array of 5 strings, nothing else.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate 5 follow-up questions for this answer:\\n\\n{{ $('Groq 1').first().json.choices[0].message.content }}\"\n    }\n  ],\n  \"temperature\": 0.5\n}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        896,
-        0
-      ],
-      "id": "06c97893-cd46-4603-9af2-2815be1f955d",
-      "name": "Groq 2"
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{\n  {\n    \"answer\": $('Groq 1').first().json.choices[0].message.content,\n    \"followUpQuestions\": $('Groq 2').first().json.choices[0].message.content\n  }\n}}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
@@ -138,6 +83,61 @@
       ],
       "id": "2d214a6c-a959-445f-a5ca-2568273d0896",
       "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer key"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  JSON.stringify({\n    \"model\": \"deepseek-chat\",\n    \"messages\": [\n      {\n        \"role\": \"system\",\n        \"content\": \"You are a helpful assistant.  Never start your answer with phrases like 'Based on the provided text', 'Based on the context', or any similar introduction. Go straight to the answer. Answer the question based ONLY on the provided context. Do not use any outside knowledge. If the answer is not in the context, say 'I could not find this in the document'. If the answer contains a list, multiple steps, or several points, you MUST format them as a clear bulleted list (using * or -). Start each point on a NEW LINE with a blank line between points to ensure clear spacing. If the context is in Arabic, answer in Arabic.\"\n      },\n      {\n        \"role\": \"user\",\n        \"content\": \"Context:\\n\" + $('Execute a SQL query').all().map(i => i.json.chunk_text).join('\\n\\n') + \"\\n\\nQuestion: \" + $('Webhook').first().json.body.question\n      }\n    ],\n    \"temperature\": 0.3\n  })\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        0
+      ],
+      "id": "647f002b-f10f-4eed-b78a-ad68cdc263eb",
+      "name": "deepseek1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer key"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  JSON.stringify({\n    \"model\": \"deepseek-chat\",\n    \"messages\": [\n      {\n        \"role\": \"system\",\n        \"content\": \"You are a helpful assistant. Generate up to 5 short follow-up questions based on the provided answer. If there are fewer than 5 relevant questions, provide only what is available. If no logical follow-up questions can be asked, return a JSON array containing only the string: 'no more follow up questions'. Return ONLY a JSON array of strings, nothing else.\"\n      },\n      {\n        \"role\": \"user\",\n        \"content\": \"Generate follow-up questions for this answer:\\n\\n\" + $(\"deepseek1\").first().json.choices[0].message.content\n      }\n    ],\n    \"response_format\": { \"type\": \"json_object\" },\n    \"temperature\": 0.5\n  })\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        896,
+        -128
+      ],
+      "id": "06c97893-cd46-4603-9af2-2815be1f955d",
+      "name": "deepseek2",
+      "disabled": true
     }
   ],
   "pinData": {},
@@ -168,25 +168,14 @@
       "main": [
         [
           {
-            "node": "Groq 1",
+            "node": "deepseek1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Groq 1": {
-      "main": [
-        [
-          {
-            "node": "Groq 2",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Groq 2": {
+    "deepseek1": {
       "main": [
         [
           {
@@ -204,7 +193,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "23563f8a-b775-440f-adcb-1c15a080751f",
+  "versionId": "a9ef498e-7b71-4ed2-ad26-4cb01e01cc12",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "284df5d3a62082a592e73574411ea9242c9a3d80f9f945c82702468ff453b3c3"

@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 
-const N8N_UPLOAD_URL = "http://localhost:5678/webhook/upload-pdf";
-const N8N_LIST_URL = "http://localhost:5678/webhook/list-pdfs";
-const N8N_GET_PDFS = "http://localhost:5678/webhook/get-pdfs";
+const N8N_UPLOAD_URL = "http://localhost:5678/webhook/upload-doc";
+const N8N_LIST_URL = "http://localhost:5678/webhook/list-docs";
+const N8N_GET_DOCS = "http://localhost:5678/webhook/get-docs";
 const N8N_GENERATE_QUESTIONS = "http://localhost:5678/webhook/generate-questions";
 const N8N_ASK_QUESTION = "http://localhost:5678/webhook/ask-question";
+const N8N_GET_FILE = "http://localhost:5678/webhook/get-file";
 
-function PDFPage() {
+function DocumentPage() {
   const [uploads, setUploads] = useState([]);
   const [loading, setLoading] = useState(false);
   const fileRef = useRef();
@@ -28,7 +29,7 @@ function PDFPage() {
     if (!file) return;
     setLoading(true);
     const formData = new FormData();
-    formData.append("pdf", file);
+    formData.append("document", file); 
     try {
       await fetch(N8N_UPLOAD_URL, { method: "POST", body: formData });
       const res = await fetch(N8N_LIST_URL);
@@ -44,7 +45,7 @@ function PDFPage() {
 
   return (
     <div>
-      <h2 style={{ fontSize: 18, fontWeight: 500, marginBottom: "1rem" }}>PDF Upload</h2>
+      <h2 style={{ fontSize: 18, fontWeight: 500, marginBottom: "1rem" }}>Document Upload</h2>
       <div
         onClick={() => !loading && fileRef.current.click()}
         style={{
@@ -53,14 +54,14 @@ function PDFPage() {
           background: "#f9f9f9", marginBottom: "1.5rem", opacity: loading ? 0.6 : 1,
         }}
       >
-        <input ref={fileRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleUpload} disabled={loading} />
+        <input ref={fileRef} type="file" accept=".pdf,.xlsx,.docx" style={{ display: "none" }} onChange={handleUpload} disabled={loading} />
         <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
         <p style={{ fontSize: 14, color: "#888" }}>
-          {loading ? "Processing..." : <><span style={{ fontWeight: 500, color: "#111" }}>Click to upload</span> a PDF</>}
+          {loading ? "Processing..." : <><span style={{ fontWeight: 500, color: "#111" }}>Click to upload</span> a document</>}
         </p>
       </div>
       {uploads.length === 0 ? (
-        <p style={{ fontSize: 14, color: "#888", textAlign: "center", padding: "2rem 0" }}>No PDFs uploaded yet</p>
+        <p style={{ fontSize: 14, color: "#888", textAlign: "center", padding: "2rem 0" }}>No documents uploaded yet</p>
       ) : (
         <div>
           <h3 style={{ fontSize: 14, fontWeight: 500, color: "#888", marginBottom: 12 }}>Upload history</h3>
@@ -91,10 +92,11 @@ function PDFPage() {
 }
 
 function ChatPage() {
-  const [step, setStep] = useState("select-pdf");
-  const [pdfs, setPdfs] = useState([]);
-  const [selectedPdf, setSelectedPdf] = useState(null);
+  const [step, setStep] = useState("select-doc");
+  const [docs, setDocs] = useState([]);
+  const [selectedDoc, setSelectedDoc] = useState(null);
   const [questions, setQuestions] = useState([]);
+  const [summary, setSummary] = useState("")
   const [answer, setAnswer] = useState("");
   const [followUps, setFollowUps] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -103,21 +105,21 @@ function ChatPage() {
   const [currentQuestion, setCurrentQuestion] = useState("");
 
   useEffect(() => {
-    fetch(N8N_GET_PDFS)
+    fetch(N8N_GET_DOCS)
       .then(r => r.json())
-      .then(data => setPdfs(Array.isArray(data) ? data : []))
+      .then(data => setDocs(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
 
-  const selectPdf = async (pdf) => {
-    setSelectedPdf(pdf);
+  const selectDoc = async (doc) => {
+    setSelectedDoc(doc);
     setStep("loading-questions");
     setLoading(true);
     try {
       const res = await fetch(N8N_GENERATE_QUESTIONS, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdf_id: pdf.id })
+        body: JSON.stringify({ document_id: doc.id })
       });
       const data = await res.json();
 
@@ -132,10 +134,11 @@ function ChatPage() {
       }
 
       setQuestions(Array.isArray(parsedQuestions) ? parsedQuestions : []);
+      setSummary(data.summary || "")
       setStep("select-question");
     } catch {
       alert("Failed to generate questions");
-      setStep("select-pdf");
+      setStep("select-doc");
     } finally {
       setLoading(false);
     }
@@ -151,22 +154,24 @@ function ChatPage() {
       const res = await fetch(N8N_ASK_QUESTION, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdf_id: selectedPdf.id, question })
+        body: JSON.stringify({ document_id: selectedDoc.id, question })
       });
       const data = await res.json();
-      setAnswer(data.answer || "");
+      setAnswer(data.choices[0].message.content || "");
+      // setAnswer(data.answer || "");
 
-      let parsedFollowUps = data.followUpQuestions;
-      if (typeof parsedFollowUps === 'string') {
-        try {
-          parsedFollowUps = JSON.parse(parsedFollowUps);
-        } catch (e) {
-          console.error("Failed to parse followUps string:", e);
-          parsedFollowUps = [];
-        }
-      }
+      // let parsedFollowUps = data.followUpQuestions;
+      // if (typeof parsedFollowUps === 'string') {
+      //   try {
+      //     parsedFollowUps = JSON.parse(parsedFollowUps);
+      //   } catch (e) {
+      //     console.error("Failed to parse followUps string:", e);
+      //     parsedFollowUps = [];
+      //   }
+      // }
 
-      setFollowUps(Array.isArray(parsedFollowUps) ? parsedFollowUps : []);
+      // setFollowUps(Array.isArray(parsedFollowUps) ? parsedFollowUps : []);
+      setFollowUps([]);
       setStep("show-answer");
     } catch {
       alert("Failed to get answer");
@@ -176,9 +181,38 @@ function ChatPage() {
     }
   };
 
+  const viewDocument = async () => {
+    const res = await fetch(N8N_GET_FILE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ document_id: selectedDoc.id })
+    });
+    const data = await res.json();
+    const item = Array.isArray(data) ? data[0] : data;
+    const blob = base64ToBlob(item.file_data, item.mime_type);
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  };
+
+  const formatAnswer = (text) => {
+    if (!text) return null;
+    return text.split('\n').map((line, i) => (
+      <p key={i} style={{ margin: line.trim().startsWith('*') || line.trim().startsWith('-') ? "4px 0" : "8px 0", direction: "auto", unicodeBidi: "plaintext" }}>
+        {line.trim().startsWith('*') ? '• ' + line.trim().slice(1).trim() : line}
+      </p>
+    ));
+  };
+
+  const base64ToBlob = (base64, mimeType) => {
+    const bytes = atob(base64);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    return new Blob([arr], { type: mimeType });
+  };
+
   const reset = () => {
-    setStep("select-pdf");
-    setSelectedPdf(null);
+    setStep("select-doc");
+    setSelectedDoc(null);
     setQuestions([]);
     setAnswer("");
     setFollowUps([]);
@@ -197,17 +231,17 @@ function ChatPage() {
     ...chipStyle, border: "0.5px solid #ccc", color: "#555", fontStyle: "italic"
   };
 
-  if (step === "select-pdf") return (
+  if (step === "select-doc") return (
     <div>
       <h2 style={{ fontSize: 18, fontWeight: 500, marginBottom: "1rem" }}>Chat</h2>
-      <p style={{ fontSize: 14, color: "#888", marginBottom: 16 }}>Select a PDF to start chatting</p>
-      {pdfs.length === 0 ? (
-        <p style={{ fontSize: 14, color: "#888" }}>No PDFs available. Upload one first.</p>
+      <p style={{ fontSize: 14, color: "#888", marginBottom: 16 }}>Select a document to start chatting</p>
+      {docs.length === 0 ? (
+        <p style={{ fontSize: 14, color: "#888" }}>No documents available. Upload one first.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {pdfs.map((pdf) => (
-            <button key={pdf.id} onClick={() => selectPdf(pdf)} style={{ ...chipStyle, padding: "14px 18px", fontSize: 15 }}>
-              📄 {pdf.name}
+          {docs.map((doc) => (
+            <button key={doc.id} onClick={() => selectDoc(doc)} style={{ ...chipStyle, padding: "14px 18px", fontSize: 15 }}>
+              📄 {doc.name}
             </button>
           ))}
         </div>
@@ -217,7 +251,7 @@ function ChatPage() {
 
   if (step === "loading-questions") return (
     <div style={{ textAlign: "center", padding: "3rem 0" }}>
-      <p style={{ fontSize: 14, color: "#888" }}>Generating questions for {selectedPdf?.name}...</p>
+      <p style={{ fontSize: 14, color: "#888" }}>Generating questions for {selectedDoc?.name}...</p>
     </div>
   );
 
@@ -227,16 +261,22 @@ function ChatPage() {
         <button onClick={reset} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#888" }}>←</button>
         <div>
           <p style={{ fontSize: 12, color: "#888", margin: 0 }}>Chatting with</p>
-          <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>📄 {selectedPdf?.name}</p>
+          <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>📄 {selectedDoc?.name}</p>
         </div>
       </div>
+      {summary && (
+        <div style={{ background: "#f5f5f5", borderRadius: 12, padding: "1rem 1.25rem", marginBottom: 16 }}>
+          <p style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>Document Summary</p>
+          <p style={{ fontSize: 14, lineHeight: 1.7, margin: 0 }}>{summary}</p>
+        </div>
+      )}
       <p style={{ fontSize: 14, color: "#888", marginBottom: 12 }}>Select a question:</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {questions?.map((q, i) => (
           <button key={i} onClick={() => askQuestion(q)} style={chipStyle}>{q}</button>
         ))}
         {!otherMode ? (
-          <button onClick={() => setOtherMode(true)} style={otherChipStyle}>✏️ Other — type your own question</button>
+          <button onClick={() => setOtherMode(true)} style={otherChipStyle}>✏️ type Another question</button>
         ) : (
           <div style={{ display: "flex", gap: 8 }}>
             <input
@@ -255,6 +295,7 @@ function ChatPage() {
             </button>
           </div>
         )}
+        <button onClick={viewDocument} style={{ ...chipStyle, color: "#555" }}>📄 View Document</button>
       </div>
     </div>
   );
@@ -271,7 +312,7 @@ function ChatPage() {
         <button onClick={() => setStep("select-question")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#888" }}>←</button>
         <div>
           <p style={{ fontSize: 12, color: "#888", margin: 0 }}>Chatting with</p>
-          <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>📄 {selectedPdf?.name}</p>
+          <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>📄 {selectedDoc?.name}</p>
         </div>
       </div>
 
@@ -282,7 +323,7 @@ function ChatPage() {
 
       <div style={{ background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 12, padding: "1rem 1.25rem", marginBottom: 20 }}>
         <p style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>Answer</p>
-        <p style={{ fontSize: 14, lineHeight: 1.7, margin: 0 }}>{answer}</p>
+        <div style={{ fontSize: 14, lineHeight: 1.7, margin: 0 }}>{formatAnswer(answer)}</div>
       </div>
 
       <p style={{ fontSize: 14, color: "#888", marginBottom: 12 }}>Follow-up questions:</p>
@@ -310,20 +351,20 @@ function ChatPage() {
             </button>
           </div>
         )}
-        <button onClick={reset} style={{ ...chipStyle, color: "#888", marginTop: 8 }}>🔄 Start over with a different PDF</button>
+        <button onClick={reset} style={{ ...chipStyle, color: "#888", marginTop: 8 }}>🔄 Start over with a different document</button>
       </div>
     </div>
   );
 }
 
 export default function App() {
-  const [page, setPage] = useState("pdf");
+  const [page, setPage] = useState("doc");
 
   return (
     <div style={{ maxWidth: 800, margin: "0 auto", padding: "2rem 1.5rem", fontFamily: "sans-serif" }}>
       <h1 style={{ fontSize: 22, fontWeight: 500, marginBottom: "1.5rem" }}>RAG Dashboard</h1>
       <div style={{ display: "flex", gap: 8, marginBottom: "1.5rem", borderBottom: "0.5px solid #e5e5e5", paddingBottom: "1rem" }}>
-        {["pdf", "chat"].map((p) => (
+        {["doc", "chat"].map((p) => (
           <button key={p} onClick={() => setPage(p)} style={{
             padding: "6px 16px", borderRadius: 8,
             border: page === p ? "0.5px solid #ccc" : "0.5px solid transparent",
@@ -331,11 +372,11 @@ export default function App() {
             fontWeight: 500, fontSize: 14, cursor: "pointer",
             color: page === p ? "#111" : "#888",
           }}>
-            {p === "pdf" ? "PDF Upload" : "Chat"}
+            {p === "doc" ? "Document Upload" : "Chat"}
           </button>
         ))}
       </div>
-      {page === "pdf" ? <PDFPage /> : <ChatPage />}
+      {page === "doc" ? <DocumentPage /> : <ChatPage />}
     </div>
   );
 }

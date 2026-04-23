@@ -1,9 +1,10 @@
 {
-  "name": "list-pdfs",
+  "name": "get-file",
   "nodes": [
     {
       "parameters": {
-        "path": "list-pdfs",
+        "httpMethod": "POST",
+        "path": "get-file",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -13,14 +14,14 @@
         0,
         0
       ],
-      "id": "cc9154c5-e0b2-4c22-8852-42ca346c9a71",
+      "id": "470fe421-6db6-46d4-8a9b-7de615e09e50",
       "name": "Webhook",
-      "webhookId": "7b9d2481-afa3-4077-bc11-829899770520"
+      "webhookId": "a7c9142b-24de-40d1-b6ae-e936bb94252d"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT id, name, size_bytes, tokens_used, duration_ms, created_at \nFROM pdfs \nORDER BY created_at DESC;",
+        "query": "SELECT encode(file_data, 'base64') as file_data, source_type,\nCASE source_type\n  WHEN 'pdf' THEN 'application/pdf'\n  WHEN 'docx' THEN 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'\n  WHEN 'xlsx' THEN 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'\n  ELSE 'application/octet-stream'\nEND as mime_type\nFROM documents WHERE id = '{{ $json.body.document_id }}';",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -29,32 +30,19 @@
         208,
         0
       ],
-      "id": "8393abea-1d56-41da-a1ff-bbc961201442",
+      "id": "6bfa57e2-f3d1-4d8d-9631-f537ada17c5d",
       "name": "Execute a SQL query",
       "credentials": {
         "postgres": {
-          "id": "p26AYoDTCVsFKQaV",
-          "name": "Postgres account"
+          "id": "oLbSC2zbJfqCqrvY",
+          "name": "Postgres account 2"
         }
       }
     },
     {
       "parameters": {
         "respondWith": "allIncomingItems",
-        "options": {
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Access-Control-Allow-Origin",
-                "value": "http://localhost:5173"
-              },
-              {
-                "name": "Content-Type",
-                "value": "application/json"
-              }
-            ]
-          }
-        }
+        "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
@@ -62,7 +50,7 @@
         416,
         0
       ],
-      "id": "dfcab84f-fc39-4c9b-9529-9b936554a66c",
+      "id": "1d60b3c7-dcf0-42fa-add1-13d33b309820",
       "name": "Respond to Webhook"
     }
   ],
@@ -97,11 +85,11 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "260f3f6f-4291-4026-86c6-2fe32a8c3ef0",
+  "versionId": "5af1139a-e4bb-4be1-a31d-8174c94d68b8",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "284df5d3a62082a592e73574411ea9242c9a3d80f9f945c82702468ff453b3c3"
   },
-  "id": "iICajckuA3haTPpp",
+  "id": "o7QjwxTdjMFbXC6r",
   "tags": []
 }

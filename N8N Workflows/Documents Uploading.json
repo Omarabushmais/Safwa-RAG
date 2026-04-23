@@ -1,0 +1,557 @@
+{
+  "name": "Documents Uploading",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer key"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "text-embedding-3-small"
+            },
+            {
+              "name": "input",
+              "value": "={{ $json.input }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 2000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -464,
+        416
+      ],
+      "id": "a3078d35-ba23-4704-878e-faa72d67e47d",
+      "name": "OpenAI Embedding Request",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"success\": true }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        656,
+        416
+      ],
+      "id": "2822d0f0-35a5-4d68-8fe3-5aff25638abc",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "upload-doc",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1584,
+        464
+      ],
+      "id": "47be5288-2980-48fa-8923-d8d4c2e2e591",
+      "name": "Webhook",
+      "webhookId": "c5196958-9de4-4b3b-9ee8-b94f9ef3aa78"
+    },
+    {
+      "parameters": {
+        "jsCode": "const chunkSize = 1000;\nconst overlap = 100;\nconst batchSize = 100;\nconst chunks = [];\nconst fullText = $input.all()[0].json.text;\n\nfor (let i = 0; i < fullText.length; i += (chunkSize - overlap)) {\n    let chunk = fullText.substring(i, i + chunkSize);\n    chunk = chunk.replace(/\\s+/g, ' ').trim();\n    if (chunk.length > 50) {\n        chunks.push(chunk);\n    }\n}\n\nconst results = [];\nfor (let i = 0; i < chunks.length; i += batchSize) {\n    results.push({\n        json: {\n            input: chunks.slice(i, i + batchSize)\n        }\n    });\n}\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -688,
+        368
+      ],
+      "id": "98dbe351-84a5-446d-92bb-9be7b00e1e9f",
+      "name": "Chunking and Batching"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\n\nreturn [{\n  json: {\n    startTime: Date.now()\n  },\n  binary: item.binary\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1360,
+        464
+      ],
+      "id": "59894d7b-e2a6-4ca9-99b6-8420963a0d20",
+      "name": "Start Time"
+    },
+    {
+      "parameters": {
+        "jsCode": "const documentId = $('Insert Document').first().json.id;\nconst embeddings = $('OpenAI Embedding Request').first().json.data;\n\nlet texts = [];\ntry {\n  texts = $('Chunking and Batching').first().json.input;\n} catch(e) {\n  texts = $('Parse Rows').all().flatMap(item => item.json.input || []);\n}\n\nreturn texts.map((text, index) => {\n  return {\n    json: {\n      document_id: documentId,\n      chunk_text: text,\n      embedding: `[${embeddings[index].embedding.join(',')}]`\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        416
+      ],
+      "id": "fd3227f4-eabc-450c-bb72-8e4adc398579",
+      "name": "Prep For Chunks"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO documents (name, size_bytes, tokens_used, duration_ms, source_type, file_data)\nVALUES ($1, $2, $3, $4, $5, decode($6, 'base64'))\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $json.name }},{{ $json.size_bytes }},{{ $json.tokens_used }},{{ $json.duration_ms }}, {{ $json.source_type }},{{ $json.file_data }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -16,
+        416
+      ],
+      "id": "287659b6-f391-415a-8262-2f8f3fb304f1",
+      "name": "Insert Document",
+      "credentials": {
+        "postgres": {
+          "id": "p26AYoDTCVsFKQaV",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f79b0783-144d-4b40-b085-65b81003dd67",
+                    "leftValue": "={{ $('Webhook').first().binary.document.fileExtension }}",
+                    "rightValue": "docx",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Webhook').first().binary.document.fileExtension }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "f1696a5f-40a5-4bb5-a20b-ed483e3dad69"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "fffa5380-e493-4697-9204-d1a3ab2d49d9",
+                    "leftValue": "={{ $('Webhook').first().binary.document.fileExtension }}",
+                    "rightValue": "xlsx",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -1136,
+        448
+      ],
+      "id": "8e37e1f1-fcc6-4bcc-adac-0405aec84cc7",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "=document",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -912,
+        464
+      ],
+      "id": "b04ba9c0-cdd0-4f84-b476-7b9c2083408d",
+      "name": "Extract from PDF"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -688,
+        704
+      ],
+      "id": "72c07c92-53db-40c9-9727-7d6c5c14237a",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst sheetName = $('Loop Over Items').first().json.sheetName;\nconst chunks = [];\n\nif (items.length === 0) return [{ json: { input: [] } }];\n\n// 1. CLEANING: Remove any rows that are completely empty/null immediately\nconst cleanedItems = items.filter(item => {\n  const vals = Object.values(item.json).map(v => String(v || '').trim()).filter(v => v !== '' && v !== 'undefined');\n  return vals.length > 0;\n});\n\nif (cleanedItems.length === 0) return [{ json: { input: [] } }];\n\n// 2. ANALYZE the first valid item\nconst initialKeys = Object.keys(cleanedItems[0].json);\nconst firstRowValues = Object.values(cleanedItems[0].json).map(v => String(v || '').trim());\n\n// Filter \"active\" keys that aren't auto-generated empty placeholders\nconst activeKeys = initialKeys.filter(k => !k.startsWith('__EMPTY') && k !== 'undefined' && k.trim() !== '');\n\nlet description = '';\nlet headers = [];\nlet dataStartIndex = 0;\n\n// Detection Logic:\nif (activeKeys.length === 1 && cleanedItems.length > 1) {\n  // Situation: Key is description, Row 1 is Headers\n  description = activeKeys[0];\n  headers = firstRowValues;\n  dataStartIndex = 1;\n} else {\n  // Situation: No description, Keys are the Headers\n  description = '';\n  headers = initialKeys;\n  dataStartIndex = 0;\n}\n\nconst prefix = description ? `${sheetName} / ${description}` : sheetName;\n\n// 3. PROCESS ROWS\nfor (let i = dataStartIndex; i < cleanedItems.length; i++) {\n  const row = cleanedItems[i].json;\n  const currentValues = Object.values(row);\n\n  const pairs = headers.map((h, idx) => {\n    // Clean up header names\n    let headerName = (h.startsWith('__EMPTY') || h === 'undefined' || h === '') ? `Column ${idx + 1}` : h;\n    \n    // Get corresponding value\n    let val = String(currentValues[idx] || '').trim();\n    if (val === '' || val === 'undefined') val = 'NO VALUE FOUND';\n    \n    return `${headerName}: ${val}`;\n  }).join(' / ');\n\n  // Final check to ensure we aren't adding \"NO VALUE FOUND\" only rows\n  if (pairs.replace(/NO VALUE FOUND/g, '').replace(/[: /]/g, '').trim() === '') continue;\n\n  chunks.push(`${prefix} [${pairs}]`);\n}\n\n// 4. BATCH RESULTS\nconst batchSize = 100;\nconst results = [];\nfor (let i = 0; i < chunks.length; i += batchSize) {\n  results.push({ json: { input: chunks.slice(i, i + batchSize) } });\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        832
+      ],
+      "id": "d32faee3-9f65-4783-9ba2-9ac3b248c4bd",
+      "name": "Parse Rows"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { read } = require('xlsx');\n\nconst binaryData = await this.helpers.getBinaryDataBuffer(0, 'document');\nconst workbook = read(binaryData);\n\nconst item = $input.first();\n\nreturn workbook.SheetNames.map((name, index) => ({ \n  json: { sheetName: name, sheetIndex: index },\n  binary: item.binary\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -912,
+        704
+      ],
+      "id": "c73c771d-dc47-471c-9ca7-fb16b0e6d484",
+      "name": "Get Excel Sheet Names"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO chunks (document_id, chunk_text, embedding)\nVALUES ($1, $2, $3::vector);",
+        "options": {
+          "queryReplacement": "={{ [$json.document_id, $json.chunk_text, $json.embedding] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        432,
+        416
+      ],
+      "id": "17cb80e0-2277-47e1-8bb8-740aa0867a5d",
+      "name": "Insert Chunks",
+      "credentials": {
+        "postgres": {
+          "id": "p26AYoDTCVsFKQaV",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const startTime = $('Start Time').first().json.startTime;\nconst endTime = Date.now();\nconst duration_ms = endTime - startTime;\n\nconst allEmbeddingItems = $('OpenAI Embedding Request').all();\nconst tokens_used = allEmbeddingItems.reduce((sum, item) => \n  sum + (item.json.usage?.total_tokens || 0), 0);\n\nconst fileInfo = $('Webhook').first().binary.document;\nconst size_bytes = Math.round(parseFloat(fileInfo.fileSize) * 1024);\nconst ext = fileInfo.fileExtension;\n\nconst base64File = $('Webhook').first().binary.document.data;\n\nreturn [{\n  json: {\n    name: fileInfo.fileName,\n    source_type: ext,\n    size_bytes: size_bytes,\n    duration_ms: duration_ms,\n    tokens_used: tokens_used,\n    file_data: base64File\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        416
+      ],
+      "id": "a7c6a4a9-adef-42be-8f25-1b8ef3bc6c43",
+      "name": "End Time and File Info"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "document",
+        "options": {
+          "sheetName": "={{ $json.sheetName }}"
+        }
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -464,
+        704
+      ],
+      "id": "1127f454-b2ae-42bd-980b-63211f31ab4a",
+      "name": "Extract from Excell"
+    },
+    {
+      "parameters": {
+        "jsCode": "const mammoth = require('mammoth');\n\nconst binaryData = await this.helpers.getBinaryDataBuffer(0, 'document');\nconst result = await mammoth.extractRawText({ buffer: binaryData });\n\nreturn [{\n  json: {\n    text: result.value\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -912,
+        272
+      ],
+      "id": "5a81625b-a1dd-4a12-b15d-82b9c5a7e724",
+      "name": "Extract from DOCX"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "OpenAI Embedding Request": {
+      "main": [
+        [
+          {
+            "node": "End Time and File Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Start Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chunking and Batching": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Embedding Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Time": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep For Chunks": {
+      "main": [
+        [
+          {
+            "node": "Insert Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Document": {
+      "main": [
+        [
+          {
+            "node": "Prep For Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Extract from DOCX",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Excel Sheet Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from PDF": {
+      "main": [
+        [
+          {
+            "node": "Chunking and Batching",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Embedding Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from Excell",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Rows": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Excel Sheet Names": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Chunks": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "End Time and File Info": {
+      "main": [
+        [
+          {
+            "node": "Insert Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from Excell": {
+      "main": [
+        [
+          {
+            "node": "Parse Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from DOCX": {
+      "main": [
+        [
+          {
+            "node": "Chunking and Batching",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "278b3c6d-31d1-44ae-b97a-b8e201f01c83",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "284df5d3a62082a592e73574411ea9242c9a3d80f9f945c82702468ff453b3c3"
+  },
+  "id": "ECa0UGMZo1WLGxck",
+  "tags": []
+}

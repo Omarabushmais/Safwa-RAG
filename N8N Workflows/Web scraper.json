@@ -1,0 +1,291 @@
+{
+  "name": "Web scraper",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2b0b69c6-66bc-48f8-9d73-4339c51bb9b0",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "https://www.safwabank.com/ar/product/%d8%aa%d9%85%d9%88%d9%8a%d9%84-%d8%a7%d9%84%d9%85%d8%b1%d9%83%d8%a8%d8%a7%d8%aa-%d9%84%d9%84%d8%a3%d9%81%d8%b1%d8%a7%d8%af/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        0
+      ],
+      "id": "f7bf856d-a71e-4f80-9a28-3415e0f825fd",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "text",
+              "cssSelector": "div.main-container"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "b40ec9a7-ffe9-4412-8737-9bd7e37d51f7",
+      "name": "HTML"
+    },
+    {
+      "parameters": {
+        "jsCode": "const chunkSize = 1000;\nconst overlap = 100;\nconst batchSize = 100;\nconst chunks = [];\nconst fullText = $input.all()[0].json.text;\n\nfor (let i = 0; i < fullText.length; i += (chunkSize - overlap)) {\n    let chunk = fullText.substring(i, i + chunkSize);\n    chunk = chunk.replace(/\\s+/g, ' ').trim();\n    if (chunk.length > 50) {\n        chunks.push(chunk);\n    }\n}\n\nconst results = [];\nfor (let i = 0; i < chunks.length; i += batchSize) {\n    results.push({\n        json: {\n            input: chunks.slice(i, i + batchSize)\n        }\n    });\n}\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "a3f37b46-b1e3-46bd-8de1-5f7d82ffd296",
+      "name": "Chunking and Batching"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer key"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "text-embedding-3-small"
+            },
+            {
+              "name": "input",
+              "value": "={{ $json.input }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 2000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        896,
+        0
+      ],
+      "id": "73fd70d0-98b5-47ab-b88c-1fcd647daff7",
+      "name": "OpenAI Embedding Request",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const documentId = $('Insert Document').first().json.id;\nconst embeddings = $('OpenAI Embedding Request').first().json.data;\n\nlet texts = [];\n\ntexts = $('Chunking and Batching').first().json.input;\n\n\nreturn texts.map((text, index) => {\n  return {\n    json: {\n      document_id: documentId,\n      chunk_text: text,\n      embedding: `[${embeddings[index].embedding.join(',')}]`\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        0
+      ],
+      "id": "225c35cf-6e5b-46b7-aad0-df7eed35fbbe",
+      "name": "Prep For Chunks"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO chunks (document_id, chunk_text, embedding)\nVALUES ($1, $2, $3::vector);",
+        "options": {
+          "queryReplacement": "={{ [$json.document_id, $json.chunk_text, $json.embedding] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1792,
+        0
+      ],
+      "id": "2621f4ec-967b-491a-89b3-0c889d8fe1c8",
+      "name": "Insert Chunks",
+      "credentials": {
+        "postgres": {
+          "id": "p26AYoDTCVsFKQaV",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO documents (name, size_bytes, tokens_used, duration_ms, source_type)\nVALUES ($1, $2, $3, $4, $5)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $json.name }},{{ $json.size_bytes }},{{ $json.tokens_used }},{{ $json.duration_ms }}, {{ $json.source_type }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1344,
+        0
+      ],
+      "id": "b1a1161c-9d7a-473b-bfb9-d3c8bac36386",
+      "name": "Insert Document",
+      "credentials": {
+        "postgres": {
+          "id": "p26AYoDTCVsFKQaV",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    name: \"Safwa Bank - Vehicle Finance\",\n    source_type: \"website\",\n    size_bytes: 0,\n    tokens_used: 0,\n    duration_ms: 0\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "28b62c04-2cd6-4c31-9db6-918fc3b4c6ba",
+      "name": "prep for docs"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Chunking and Batching",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chunking and Batching": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Embedding Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Embedding Request": {
+      "main": [
+        [
+          {
+            "node": "prep for docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep For Chunks": {
+      "main": [
+        [
+          {
+            "node": "Insert Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Document": {
+      "main": [
+        [
+          {
+            "node": "Prep For Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prep for docs": {
+      "main": [
+        [
+          {
+            "node": "Insert Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "694299fc-2fd0-400c-84c9-18c7a733fb87",
+  "meta": {
+    "instanceId": "284df5d3a62082a592e73574411ea9242c9a3d80f9f945c82702468ff453b3c3"
+  },
+  "id": "8HmCZCWIobK7Q0J2",
+  "tags": []
+}
